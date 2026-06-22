@@ -12,7 +12,7 @@ compatibility_flags = ["nodejs_compat"]
 # Shared KV namespace with oriz-status-ping — same id.
 [[kv_namespaces]]
 binding = "STATUS_KV"
-id = "REPLACE_ME_AFTER_KV_CREATE"
+id = "be79402f914a40c0aa1672c1560e82db"
 
 # Custom domain — bind via dashboard or:
 #   wrangler deploy --config workers/wrangler.api.toml

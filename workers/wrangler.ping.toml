@@ -17,7 +17,7 @@ crons = ["*/5 * * * *"]
 #   wrangler kv namespace create STATUS_KV
 [[kv_namespaces]]
 binding = "STATUS_KV"
-id = "REPLACE_ME_AFTER_KV_CREATE"
+id = "be79402f914a40c0aa1672c1560e82db"
 
 # Secrets (set via `wrangler secret put`):
 #   wrangler secret put TELEGRAM_BOT_TOKEN
