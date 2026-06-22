@@ -1,0 +1,22 @@
+# oriz-status-api — read-only Worker
+#
+# Serves /api/status, /api/uptime, /api/incidents, /feed.xml from KV.
+# Custom domain status-api.oriz.in bound via dashboard (one-level
+# subdomain — Universal SSL covers it per Rule 16).
+
+name = "oriz-status-api"
+main = "status-api.ts"
+compatibility_date = "2026-06-17"
+compatibility_flags = ["nodejs_compat"]
+
+# Shared KV namespace with oriz-status-ping — same id.
+[[kv_namespaces]]
+binding = "STATUS_KV"
+id = "REPLACE_ME_AFTER_KV_CREATE"
+
+# Custom domain — bind via dashboard or:
+#   wrangler deploy --config workers/wrangler.api.toml
+#   (then) Workers & Pages → oriz-status-api → Settings → Triggers → Add Custom Domain → status-api.oriz.in
+
+[observability]
+enabled = true

@@ -1,0 +1,163 @@
+/*
+ * Dark, monospaced, status-page palette. Tokens-first so individual
+ * components don't hardcode hex values.
+ */
+:root {
+  --bg: #0b1220;
+  --bg-elev: #131c2e;
+  --bg-card: #182236;
+  --border: #243049;
+  --fg: #e2e8f0;
+  --fg-muted: #94a3b8;
+  --fg-dim: #64748b;
+
+  --status-up: #22c55e;
+  --status-up-glow: #22c55e33;
+  --status-degraded: #f59e0b;
+  --status-degraded-glow: #f59e0b33;
+  --status-down: #ef4444;
+  --status-down-glow: #ef444433;
+  --status-unknown: #64748b;
+
+  --font-sans: 'Inter Variable', Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  --font-mono: 'IBM Plex Mono', 'JetBrains Mono', ui-monospace, SFMono-Regular, Consolas, monospace;
+
+  --radius: 8px;
+  --radius-sm: 4px;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.5), 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+a { color: inherit; text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 32px 20px 80px;
+}
+
+/* ── Hero ─────────────────────────────────────────────────────── */
+.hero {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 28px 24px;
+  border-radius: var(--radius);
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  margin-bottom: 32px;
+}
+.hero[data-state="up"] { border-color: var(--status-up); box-shadow: 0 0 0 1px var(--status-up-glow); }
+.hero[data-state="degraded"] { border-color: var(--status-degraded); box-shadow: 0 0 0 1px var(--status-degraded-glow); }
+.hero[data-state="down"] { border-color: var(--status-down); box-shadow: 0 0 0 1px var(--status-down-glow); }
+
+.hero h1 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.hero .sub {
+  margin-top: 4px;
+  color: var(--fg-muted);
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+/* ── Status grid ──────────────────────────────────────────────── */
+.section-title {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--fg-dim);
+  margin: 32px 0 12px;
+  font-family: var(--font-mono);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 8px;
+}
+
+.card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  transition: transform 80ms ease, border-color 120ms ease;
+}
+.card:hover { transform: translateY(-1px); border-color: var(--fg-dim); }
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--status-unknown);
+  flex-shrink: 0;
+  box-shadow: 0 0 0 3px transparent;
+}
+.dot.up { background: var(--status-up); box-shadow: 0 0 0 3px var(--status-up-glow); }
+.dot.degraded { background: var(--status-degraded); box-shadow: 0 0 0 3px var(--status-degraded-glow); }
+.dot.down { background: var(--status-down); box-shadow: 0 0 0 3px var(--status-down-glow); }
+.dot.pulse { animation: pulse 1.6s ease-in-out infinite; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+.card .name {
+  flex: 1;
+  font-weight: 500;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card .ms {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--fg-muted);
+  flex-shrink: 0;
+}
+
+/* ── Footer ───────────────────────────────────────────────────── */
+footer {
+  margin-top: 64px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--fg-dim);
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+footer a:hover { color: var(--fg); }
+
+/* ── Mobile ──────────────────────────────────────────────────── */
+@media (max-width: 540px) {
+  .container { padding: 16px 12px 60px; }
+  .hero { flex-direction: column; align-items: flex-start; padding: 20px; }
+  .hero h1 { font-size: 22px; }
+  .grid { grid-template-columns: 1fr; }
+}

@@ -1,0 +1,79 @@
+---
+import BaseLayout from '~/layouts/BaseLayout.astro'
+import StatusGrid from '~/components/StatusGrid.astro'
+import { TARGETS } from '~/data/targets'
+
+const totalCount = TARGETS.length
+const apiBase = import.meta.env.PUBLIC_STATUS_API_BASE ?? 'https://status-api.oriz.in'
+---
+<BaseLayout>
+  <main class="container">
+    <div class="hero" data-state="unknown" id="hero">
+      <div style="flex: 1;">
+        <h1 id="hero-title">Checking status…</h1>
+        <div class="sub" id="hero-sub">Loading the latest probe ·  <span id="hero-count">— of {totalCount}</span> services up · last update <span id="hero-ts">—</span></div>
+      </div>
+    </div>
+
+    <StatusGrid />
+
+    <footer>
+      <div>
+        <strong>oriz / status</strong> · <a href="/feed.xml">RSS</a> · <a href="https://github.com/oriz-co/oriz-status-app">source</a>
+      </div>
+      <div>
+        Probes every 5 min · cached 60 sec · all times IST
+      </div>
+    </footer>
+  </main>
+
+  <script is:inline define:vars={{ apiBase }}>
+    const fmtMs = (ms) => (ms == null ? '—' : ms < 1000 ? ms + 'ms' : (ms / 1000).toFixed(2) + 's')
+    const fmtTs = (ts) => {
+      if (!ts) return '—'
+      const d = new Date(ts)
+      const hh = String(d.getHours()).padStart(2, '0')
+      const mm = String(d.getMinutes()).padStart(2, '0')
+      return hh + ':' + mm
+    }
+
+    async function refresh() {
+      try {
+        const res = await fetch(apiBase + '/api/status', { cache: 'no-store' })
+        if (!res.ok) throw new Error('http ' + res.status)
+        const data = await res.json()
+        if (!data || !Array.isArray(data.services)) return
+        let upCount = 0
+        let downCount = 0
+        for (const s of data.services) {
+          const el = document.querySelector('[data-slug="' + s.slug + '"]')
+          if (!el) continue
+          const dot = el.querySelector('.dot')
+          const ms = el.querySelector('[data-ms]')
+          dot.classList.remove('pulse', 'up', 'degraded', 'down')
+          if (s.status === 'up') { dot.classList.add('up'); upCount++ }
+          else if (s.status === 'degraded') { dot.classList.add('degraded') }
+          else { dot.classList.add('down'); downCount++ }
+          ms.textContent = fmtMs(s.ms)
+        }
+        const total = document.querySelectorAll('[data-slug]').length
+        const hero = document.getElementById('hero')
+        const title = document.getElementById('hero-title')
+        const sub = document.getElementById('hero-sub')
+        const count = document.getElementById('hero-count')
+        const ts = document.getElementById('hero-ts')
+        if (downCount === 0) { hero.dataset.state = 'up'; title.textContent = 'All systems operational' }
+        else if (downCount < total / 4) { hero.dataset.state = 'degraded'; title.textContent = 'Partial outage' }
+        else { hero.dataset.state = 'down'; title.textContent = 'Major outage' }
+        count.textContent = upCount + ' of ' + total
+        ts.textContent = fmtTs(data.at)
+        sub.innerHTML = 'Latest probe · <strong>' + upCount + ' of ' + total + '</strong> services up · last update <span>' + fmtTs(data.at) + '</span>'
+      } catch (e) {
+        console.warn('status fetch failed', e)
+      }
+    }
+
+    refresh()
+    setInterval(refresh, 60_000)
+  </script>
+</BaseLayout>

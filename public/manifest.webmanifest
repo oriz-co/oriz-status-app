@@ -1,0 +1,10 @@
+{
+  "name": "oriz / status",
+  "short_name": "oriz-status",
+  "description": "Real-time status + 90-day uptime history for the oriz.in family.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b1220",
+  "theme_color": "#0b1220",
+  "icons": []
+}

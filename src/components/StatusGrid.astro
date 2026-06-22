@@ -1,0 +1,38 @@
+---
+/*
+ * Status grid — renders a server-side initial placeholder (using TARGETS
+ * with status:'unknown'), then client-side JS swaps the dots/ms once
+ * the /api/status fetch completes. Polls every 60 sec.
+ *
+ * Why SSR placeholder: search engines + JS-off users still get the list
+ * of every site, even if the live status is unknown. Progressive
+ * enhancement.
+ */
+import { TARGETS } from '~/data/targets'
+
+const groups = {
+  master: TARGETS.filter(t => t.category === 'master'),
+  app: TARGETS.filter(t => t.category === 'app'),
+  api: TARGETS.filter(t => t.category === 'api'),
+}
+
+const labels: Record<string, string> = {
+  master: 'Apex',
+  app: 'Apps',
+  api: 'APIs',
+}
+---
+{Object.entries(groups).map(([cat, items]) => items.length > 0 && (
+  <>
+    <div class="section-title">{labels[cat]} · {items.length}</div>
+    <div class="grid" data-group={cat}>
+      {items.map(t => (
+        <a class="card" href={t.url} target="_blank" rel="noopener" data-slug={t.slug}>
+          <span class="dot pulse" aria-hidden="true"></span>
+          <span class="name">{t.name}</span>
+          <span class="ms" data-ms>—</span>
+        </a>
+      ))}
+    </div>
+  </>
+))}

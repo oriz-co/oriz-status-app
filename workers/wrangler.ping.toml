@@ -1,0 +1,29 @@
+# oriz-status-ping — cron Worker
+#
+# Runs every 5 min. Probes every URL in workers/targets.ts and writes
+# results to KV. Telegram alerts on status changes.
+
+name = "oriz-status-ping"
+main = "ping-cron.ts"
+compatibility_date = "2026-06-17"
+compatibility_flags = ["nodejs_compat"]
+
+# Cron: every 5 minutes.
+[triggers]
+crons = ["*/5 * * * *"]
+
+# KV namespace binding — same namespace shared with oriz-status-api.
+# Replace the id below with the actual KV namespace id after running:
+#   wrangler kv namespace create STATUS_KV
+[[kv_namespaces]]
+binding = "STATUS_KV"
+id = "REPLACE_ME_AFTER_KV_CREATE"
+
+# Secrets (set via `wrangler secret put`):
+#   wrangler secret put TELEGRAM_BOT_TOKEN
+#   wrangler secret put TELEGRAM_OPS_CHAT_ID
+#
+# Both are OPTIONAL. If missing, Telegram alerts no-op.
+
+[observability]
+enabled = true

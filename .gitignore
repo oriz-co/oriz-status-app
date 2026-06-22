@@ -1,0 +1,10 @@
+# dependencies / build / env
+node_modules/
+dist/
+.astro/
+.wrangler/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store

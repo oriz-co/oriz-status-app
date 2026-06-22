@@ -1,0 +1,32 @@
+---
+import '~/styles/global.css'
+
+interface Props {
+  title?: string
+  description?: string
+}
+const {
+  title = 'oriz / status — all systems status',
+  description = 'Real-time status + 90-day uptime history for every site in the oriz.in family.',
+} = Astro.props
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={`https://status.oriz.in${Astro.url.pathname}`} />
+    <meta name="theme-color" content="#0b1220" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="alternate" type="application/rss+xml" title="oriz status incidents" href="/feed.xml" />
+    <link rel="preconnect" href="https://status-api.oriz.in" crossorigin />
+  </head>
+  <body>
+    <slot />
+  </body>
+</html>

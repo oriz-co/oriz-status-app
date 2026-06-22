@@ -1,0 +1,30 @@
+{
+  "name": "@chirag127/oriz-status-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Custom status page + uptime monitoring for the oriz.in family. CF Worker cron + KV + Astro static. Replaces UptimeRobot.",
+  "license": "MIT",
+  "packageManager": "pnpm@10.34.3",
+  "engines": { "node": ">=22.12.0" },
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "deploy:pages": "wrangler pages deploy dist --project-name=oriz-status",
+    "deploy:worker:ping": "wrangler deploy --config workers/wrangler.ping.toml",
+    "deploy:worker:api": "wrangler deploy --config workers/wrangler.api.toml",
+    "deploy:all": "pnpm build && pnpm deploy:pages && pnpm deploy:worker:ping && pnpm deploy:worker:api",
+    "typecheck": "astro check"
+  },
+  "dependencies": {
+    "astro": "^6.4.7"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.0",
+    "@cloudflare/workers-types": "^4.20250101.0",
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0",
+    "wrangler": "^4.102.0"
+  }
+}
