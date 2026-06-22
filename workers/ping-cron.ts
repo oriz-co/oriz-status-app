@@ -1,19 +1,22 @@
 /*
  * oriz-status-ping — cron worker that probes every site in TARGETS every
- * 5 minutes, writes the latest snapshot + a daily rollup to KV, and
- * fires a Telegram alert on any status transition.
+ * 5 minutes and writes ONE consolidated KV blob (`status:current`) per
+ * tick, plus fires a Telegram alert on any status transition.
  *
- * KV keys written:
- *   - latest          : { at, services: ProbeResult[] }     (no TTL — overwritten)
- *   - previous        : same shape, snapshot from the prior tick (used for diff)
- *   - history:YYYY-MM-DD : { [slug]: { up, down, total } }  (90 day TTL)
- *   - incidents       : last 50 status transitions as JSON array (no TTL, capped)
+ * KV writes (1 per tick to stay under Free tier 1000 writes/day cap):
+ *   - status:current : {
+ *       at: number,
+ *       services: ProbeResult[],          // latest snapshot
+ *       previous: ProbeResult[],          // last tick's services (for diff)
+ *       history: {                        // last 90 days, daily rollup
+ *         [day: 'YYYY-MM-DD']: { [slug]: { up, down, total } }
+ *       },
+ *       incidents: Transition[]           // last 50 status transitions
+ *     }
  *
- * Free-tier math: 24 targets × 288 ticks/day = 6,912 outbound subrequests/day.
- * Workers Free is 100K/day total, so we have ~14× headroom.
- *
- * If TARGETS grows past 50, drop subrequests-per-invocation past 50 (Free
- * limit) into chunks of 50.
+ * Free-tier math: 25 targets × 288 ticks/day = 7,200 outbound subrequests/day
+ * (Workers Free is 100K/day). KV writes: 1/tick × 288/day = 288 writes/day
+ * (KV Free is 1,000/day). Comfortable headroom on both.
  */
 import { TARGETS } from './targets'
 
@@ -35,7 +38,28 @@ interface ProbeResult {
   error?: string
 }
 
+interface Transition {
+  slug: string
+  name: string
+  from: string
+  to: string
+  at: number
+  code: number
+}
+
+type DayRollup = Record<string, { up: number; down: number; total: number }>
+
+interface StatusBlob {
+  at: number
+  services: ProbeResult[]
+  previous: ProbeResult[]
+  history: Record<string, DayRollup>
+  incidents: Transition[]
+}
+
 const TIMEOUT_MS = 8000
+const HISTORY_DAYS = 90
+const INCIDENTS_CAP = 50
 
 async function probe(t: typeof TARGETS[number]): Promise<ProbeResult> {
   const start = Date.now()
@@ -80,6 +104,18 @@ async function telegramAlert(env: Env, text: string): Promise<void> {
   }
 }
 
+function pruneHistory(history: Record<string, DayRollup>, today: string): Record<string, DayRollup> {
+  // Keep only the most recent HISTORY_DAYS days (lex order works for YYYY-MM-DD).
+  const cutoff = new Date(today + 'T00:00:00Z')
+  cutoff.setUTCDate(cutoff.getUTCDate() - (HISTORY_DAYS - 1))
+  const cutoffStr = cutoff.toISOString().slice(0, 10)
+  const out: Record<string, DayRollup> = {}
+  for (const day of Object.keys(history)) {
+    if (day >= cutoffStr) out[day] = history[day]
+  }
+  return out
+}
+
 export default {
   async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
     // Chunk into batches of 25 to stay well under the 50-subrequest free-tier
@@ -93,14 +129,16 @@ export default {
     }
 
     const now = Date.now()
-    const snapshot = { at: now, services: all }
+
+    // Single KV read for the consolidated blob.
+    const prevRaw = await env.STATUS_KV.get('status:current')
+    const prevBlob: StatusBlob | null = prevRaw ? JSON.parse(prevRaw) : null
 
     // Diff against previous snapshot for incident detection.
-    const prevRaw = await env.STATUS_KV.get('latest')
-    const prev: { at: number; services: ProbeResult[] } | null = prevRaw ? JSON.parse(prevRaw) : null
-    const prevBySlug = new Map((prev?.services ?? []).map(s => [s.slug, s]))
+    const prevServices = prevBlob?.services ?? []
+    const prevBySlug = new Map(prevServices.map(s => [s.slug, s]))
 
-    const transitions: { slug: string; name: string; from: string; to: string; at: number; code: number }[] = []
+    const transitions: Transition[] = []
     for (const s of all) {
       const before = prevBySlug.get(s.slug)
       if (before && before.status !== s.status) {
@@ -108,36 +146,43 @@ export default {
       }
     }
 
-    // Daily rollup
+    // Daily rollup (in-memory, pruned to last 90 days).
     const day = new Date(now).toISOString().slice(0, 10)
-    const historyKey = `history:${day}`
-    const existing: Record<string, { up: number; down: number; total: number }> =
-      JSON.parse((await env.STATUS_KV.get(historyKey)) || '{}')
+    const history = prevBlob?.history ?? {}
+    const today: DayRollup = history[day] ?? {}
     for (const r of all) {
-      const slot = existing[r.slug] ?? { up: 0, down: 0, total: 0 }
+      const slot = today[r.slug] ?? { up: 0, down: 0, total: 0 }
       slot.total++
       if (r.status === 'up' || r.status === 'degraded') slot.up++
       else slot.down++
-      existing[r.slug] = slot
+      today[r.slug] = slot
     }
+    history[day] = today
+    const prunedHistory = pruneHistory(history, day)
 
-    // Incidents log (capped 50)
+    // Incidents log (capped 50).
+    const prevIncidents = prevBlob?.incidents ?? []
+    const incidents = transitions.length > 0
+      ? [...transitions, ...prevIncidents].slice(0, INCIDENTS_CAP)
+      : prevIncidents
+
+    // Telegram alert (out-of-band, doesn't gate the write).
     if (transitions.length > 0) {
-      const incidentsRaw = (await env.STATUS_KV.get('incidents')) || '[]'
-      const incidents: typeof transitions = JSON.parse(incidentsRaw)
-      const updated = [...transitions, ...incidents].slice(0, 50)
-      ctx.waitUntil(env.STATUS_KV.put('incidents', JSON.stringify(updated)))
-
-      // Telegram alert
       const lines = transitions.map(t =>
         `${t.to === 'down' ? '🔴' : t.to === 'degraded' ? '🟡' : '🟢'} *${t.name}*  ${t.from} → *${t.to}*${t.code ? `  (HTTP ${t.code})` : ''}`
       )
       ctx.waitUntil(telegramAlert(env, `*oriz / status*\n\n${lines.join('\n')}\n\nhttps://status.oriz.in`))
     }
 
-    ctx.waitUntil(env.STATUS_KV.put('previous', prevRaw || '{}'))
-    ctx.waitUntil(env.STATUS_KV.put('latest', JSON.stringify(snapshot)))
-    ctx.waitUntil(env.STATUS_KV.put(historyKey, JSON.stringify(existing), { expirationTtl: 90 * 86400 }))
+    // ONE KV write per tick (vs 4 previously). 288/day vs Free tier 1,000/day.
+    const blob: StatusBlob = {
+      at: now,
+      services: all,
+      previous: prevServices,
+      history: prunedHistory,
+      incidents,
+    }
+    ctx.waitUntil(env.STATUS_KV.put('status:current', JSON.stringify(blob)))
   },
 
   // Allow manual trigger via fetch (for testing).
